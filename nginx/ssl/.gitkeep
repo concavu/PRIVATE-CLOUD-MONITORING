@@ -1,0 +1,4 @@
+# Place your SSL/TLS certificates here:
+# server.crt
+# server.key
+# (Can be automatically generated via ./setup.sh)
