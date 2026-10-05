@@ -1,0 +1,67 @@
+groups:
+  - name: private-cloud-availability
+    rules:
+      - alert: PrometheusTargetDown
+        expr: up{job!="prometheus"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus target is unavailable"
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for over 2 minutes."
+
+      - alert: ServiceProbeFailed
+        expr: probe_success == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A private-cloud service probe is failing"
+          description: "The HTTP probe for {{ $labels.instance }} has failed for over 2 minutes."
+
+  - name: private-cloud-capacity
+    rules:
+      - alert: HostCpuUsageHigh
+        expr: 100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host CPU usage is high"
+          description: "CPU usage on {{ $labels.instance }} has exceeded 90% for 10 minutes."
+
+      - alert: HostMemoryUsageHigh
+        expr: 100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory usage is high"
+          description: "Memory usage on {{ $labels.instance }} has exceeded 90% for 10 minutes."
+
+      - alert: HostFilesystemSpaceLow
+        expr: 100 * node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"} < 10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host filesystem space is low"
+          description: "Filesystem {{ $labels.mountpoint }} on {{ $labels.instance }} has less than 10% free space."
+
+      - alert: ContainerMemoryUsageHigh
+        expr: container_memory_working_set_bytes{name!=""} / (container_spec_memory_limit_bytes{name!=""} > 0) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container memory usage is high"
+          description: "Container {{ $labels.name }} is using over 90% of its memory limit."
+
+      - alert: ContainerOutOfMemory
+        expr: increase(container_oom_events_total{name!=""}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A container was terminated by the OOM killer"
+          description: "cAdvisor reported an OOM event for container {{ $labels.name }}."

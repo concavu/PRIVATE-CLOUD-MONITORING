@@ -18,18 +18,75 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Validate shell scripts
-        run: bash -n setup.sh scripts/backup.sh scripts/restore.sh scripts/optimize.sh
+        run: bash -n setup.sh scripts/*.sh
+
+      - name: Validate MariaDB exporter user initialization
+        run: |
+          test_password="$(openssl rand -hex 32)"
+          docker run -d --name mariadb-exporter-init-test \
+            -e MYSQL_ROOT_PASSWORD=test-root-password \
+            -e MYSQL_EXPORTER_USER=prometheus_exporter \
+            -e MYSQL_EXPORTER_PASSWORD="$test_password" \
+            -v "$PWD/scripts/create-mysql-exporter-user.sh:/docker-entrypoint-initdb.d/10-create-mysql-exporter-user.sh:ro" \
+            mariadb:10.11
+          trap 'docker rm -f mariadb-exporter-init-test >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 60); do
+            if docker exec mariadb-exporter-init-test healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker logs mariadb-exporter-init-test
+              exit 1
+            fi
+            sleep 2
+          done
+          docker exec -e MYSQL_PWD=test-root-password mariadb-exporter-init-test \
+            mariadb --user=root --batch --skip-column-names \
+            --execute="SHOW GRANTS FOR 'prometheus_exporter'@'%'" \
+            | grep -Eq 'PROCESS.*(REPLICATION CLIENT|BINLOG MONITOR)'
 
       - name: Validate Grafana dashboard JSON
-        run: python -m json.tool monitoring/grafana/dashboards/host-and-containers.json > /dev/null
+        run: |
+          for dashboard in monitoring/grafana/dashboards/*.json; do
+            python -m json.tool "$dashboard" > /dev/null
+          done
 
-      - name: Validate Prometheus configuration
+      - name: Validate Prometheus configuration and alert rules
         run: |
           docker run --rm \
             --entrypoint=/bin/promtool \
-            -v "$PWD/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" \
             prom/prometheus:v2.53.0 \
             check config /etc/prometheus/prometheus.yml
+          docker run --rm \
+            --entrypoint=/bin/promtool \
+            -v "$PWD/monitoring/prometheus:/etc/prometheus:ro" \
+            prom/prometheus:v2.53.0 \
+            check rules /etc/prometheus/alerts.yml
+
+      - name: Validate Nginx configuration
+        run: |
+          cert_dir="$(mktemp -d)"
+          trap 'rm -rf "$cert_dir"' EXIT
+          openssl req -x509 -nodes -days 1 -newkey rsa:2048 \
+            -keyout "$cert_dir/server.key" \
+            -out "$cert_dir/server.crt" \
+            -subj '/CN=localhost'
+          docker run --rm \
+            --add-host nextcloud:127.0.0.1 \
+            --add-host minio:127.0.0.1 \
+            -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            -v "$PWD/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$cert_dir:/etc/nginx/ssl:ro" \
+            nginx:1.27-alpine nginx -t
+
+      - name: Validate black-box exporter configuration
+        run: |
+          docker run --rm \
+            -v "$PWD/monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro" \
+            prom/blackbox-exporter:v0.25.0 \
+            --config.file=/etc/blackbox_exporter/config.yml \
+            --config.check
 
       - name: Validate core Compose configuration
         run: docker compose --env-file .env.example config --quiet

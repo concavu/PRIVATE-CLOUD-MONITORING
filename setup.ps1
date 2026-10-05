@@ -14,7 +14,7 @@ if (-not (Test-Path ".env")) {
 $EnvPath = Join-Path (Get-Location) ".env"
 $EnvLines = [System.Collections.Generic.List[string]]::new()
 $EnvLines.AddRange([string[]](Get-Content -LiteralPath $EnvPath))
-$SecretKeys = @("ADMIN_PASSWORD", "MYSQL_ROOT_PASSWORD", "MYSQL_PASSWORD", "REDIS_PASSWORD", "MINIO_ROOT_PASSWORD", "GRAFANA_ADMIN_PASSWORD")
+$SecretKeys = @("ADMIN_PASSWORD", "MYSQL_ROOT_PASSWORD", "MYSQL_PASSWORD", "MYSQL_EXPORTER_PASSWORD", "REDIS_PASSWORD", "MINIO_ROOT_PASSWORD", "GRAFANA_ADMIN_PASSWORD")
 $EnvChanged = $false
 foreach ($SecretKey in $SecretKeys) {
     $LineIndex = -1

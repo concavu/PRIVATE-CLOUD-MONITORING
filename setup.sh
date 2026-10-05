@@ -50,7 +50,7 @@ set_secret_if_missing_or_placeholder() {
     fi
 }
 
-for secret_key in ADMIN_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_PASSWORD REDIS_PASSWORD MINIO_ROOT_PASSWORD GRAFANA_ADMIN_PASSWORD; do
+for secret_key in ADMIN_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_PASSWORD MYSQL_EXPORTER_PASSWORD REDIS_PASSWORD MINIO_ROOT_PASSWORD GRAFANA_ADMIN_PASSWORD; do
     set_secret_if_missing_or_placeholder "$secret_key"
 done
 
@@ -62,7 +62,7 @@ fi
 SSL_DIR="./nginx/ssl"
 if [ ! -f "$SSL_DIR/server.crt" ] || [ ! -f "$SSL_DIR/server.key" ]; then
     echo -e "${BLUE}[+] Đang sinh cặp chứng chỉ SSL/TLS (Self-Signed 2048-bit RSA)...${NC}"
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    MSYS_NO_PATHCONV=1 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout "$SSL_DIR/server.key" \
         -out "$SSL_DIR/server.crt" \
         -subj "/C=VN/ST=Hanoi/L=Hanoi/O=PrivateCloud/OU=DevOps/CN=cloud.local" \

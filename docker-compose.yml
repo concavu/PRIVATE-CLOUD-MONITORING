@@ -20,6 +20,7 @@ services:
         ipv4_address: 172.20.10.2
       storage_net:
         ipv4_address: 172.20.30.2
+      monitoring_net: {}
     depends_on:
       nextcloud:
         condition: service_started
@@ -125,8 +126,11 @@ services:
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_EXPORTER_USER=${MYSQL_EXPORTER_USER}
+      - MYSQL_EXPORTER_PASSWORD=${MYSQL_EXPORTER_PASSWORD}
     volumes:
       - mariadb_data:/var/lib/mysql
+      - ./scripts/create-mysql-exporter-user.sh:/docker-entrypoint-initdb.d/10-create-mysql-exporter-user.sh:ro
     networks:
       backend_net:
         ipv4_address: 172.20.20.4
@@ -194,11 +198,13 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - MINIO_BROWSER_REDIRECT_URL=https://${DOMAIN_NAME}/minio-console
+      - MINIO_PROMETHEUS_AUTH_TYPE=public
     volumes:
       - minio_data:/data
     networks:
       storage_net:
         ipv4_address: 172.20.30.4
+      monitoring_net: {}
     healthcheck:
       test: ["CMD", "/bin/mc", "ready", "local"]
       interval: 10s
@@ -250,6 +256,12 @@ networks:
       config:
         - subnet: ${STORAGE_SUBNET:-172.20.30.0/24}
           gateway: 172.20.30.1
+
+  # Metrics traffic stays on an isolated network with no host-published ports.
+  monitoring_net:
+    name: net_cloud_monitoring
+    driver: bridge
+    internal: true
 
 # ==============================================================================
 # PERSISTENT VOLUMES

@@ -3,7 +3,6 @@ services:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: monitoring_cadvisor
     restart: unless-stopped
-    privileged: true
     devices:
       - /dev/kmsg:/dev/kmsg
     volumes:
@@ -30,12 +29,58 @@ services:
     networks:
       - monitoring_net
 
+  mysqld_exporter:
+    image: prom/mysqld-exporter:v0.17.2
+    container_name: monitoring_mysqld_exporter
+    restart: unless-stopped
+    command:
+      - '--mysqld.address=mariadb:3306'
+      - '--mysqld.username=${MYSQL_EXPORTER_USER}'
+    environment:
+      - MYSQLD_EXPORTER_PASSWORD=${MYSQL_EXPORTER_PASSWORD}
+    networks:
+      - monitoring_net
+      - backend_net
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: monitoring_redis_exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - monitoring_net
+      - backend_net
+
+  nginx_exporter:
+    image: nginx/nginx-prometheus-exporter:1.4.2
+    container_name: monitoring_nginx_exporter
+    restart: unless-stopped
+    command:
+      - '--nginx.scrape-uri=http://nginx:8080/nginx_status'
+    networks:
+      - monitoring_net
+
+  blackbox_exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: monitoring_blackbox_exporter
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+    networks:
+      - monitoring_net
+      - storage_net
+
   prometheus:
     image: prom/prometheus:v2.53.0
     container_name: monitoring_prometheus
     restart: unless-stopped
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -44,6 +89,13 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
       - monitoring_net
+    depends_on:
+      - cadvisor
+      - node_exporter
+      - mysqld_exporter
+      - redis_exporter
+      - nginx_exporter
+      - blackbox_exporter
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -64,7 +116,14 @@ services:
 
 networks:
   monitoring_net:
-    driver: bridge
+    name: net_cloud_monitoring
+    external: true
+  backend_net:
+    name: net_cloud_backend
+    external: true
+  storage_net:
+    name: net_cloud_storage
+    external: true
 
 volumes:
   prometheus_data:
