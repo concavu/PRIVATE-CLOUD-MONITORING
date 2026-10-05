@@ -45,13 +45,9 @@ docker exec -u www-data nextcloud_app_core php occ maintenance:mode --on 2>/dev/
 # 2. Dump Database MariaDB với cờ --single-transaction để không lock bảng
 log "INFO" "[2/6] Đang xuất (dump) cơ sở dữ liệu MariaDB [${MYSQL_DATABASE}]..."
 DB_DUMP_FILE="${TMP_DIR}/mariadb_${MYSQL_DATABASE}_${TIMESTAMP}.sql"
-docker exec mariadb_db_engine mariadb-dump \
-    -u root -p"${MYSQL_ROOT_PASSWORD}" \
-    --single-transaction \
-    --quick \
-    --routines \
-    --triggers \
-    "${MYSQL_DATABASE}" > "${DB_DUMP_FILE}"
+docker exec mariadb_db_engine sh -c \
+    'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb-dump -u root --single-transaction --quick --routines --triggers "$MYSQL_DATABASE"' \
+    > "${DB_DUMP_FILE}"
 
 log "INFO" "Dump Database hoàn tất: $(du -sh "${DB_DUMP_FILE}" | awk '{print $1}')"
 

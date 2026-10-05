@@ -11,8 +11,8 @@ Containerized private-cloud storage and observability platform built with Docker
 
 ## Quick start
 
-1. Copy `.env.example` to `.env` and replace every development secret.
-2. Run `./setup.sh` on Linux/macOS, or `./setup.ps1` in PowerShell.
+1. Copy `.env.example` to `.env` and replace every example credential with a unique, strong secret, including `GRAFANA_ADMIN_PASSWORD`.
+2. Run `./setup.sh` on Linux/macOS, or `./setup.ps1` in PowerShell. OpenSSL must be installed and available on `PATH` so the setup script can generate a local self-signed certificate when needed.
 3. Start the core stack:
 
    ```bash
@@ -25,16 +25,39 @@ Containerized private-cloud storage and observability platform built with Docker
    docker compose -f docker-compose.monitoring.yml up -d
    ```
 
-5. Check status with `docker compose ps`.
+5. Check the core stack with `docker compose ps`, and monitoring with `docker compose -f docker-compose.monitoring.yml ps`.
 
-The default development endpoints are `https://cloud.local`, Grafana at `http://localhost:3000`, and MinIO at `http://localhost:9001`. The TLS certificate is self-signed for local development.
+If you already have a `.env` from an earlier version, add a strong `GRAFANA_ADMIN_PASSWORD` value before starting the monitoring stack.
+
+The development endpoints are `https://cloud.local`, Grafana at `http://localhost:3000`, and the MinIO console at `https://cloud.local/minio-console/`. Add `cloud.local` to the host's hosts file if needed. The TLS certificate is self-signed for local development. MinIO's API and console ports are not published directly to the host.
+
+Prometheus currently scrapes itself, cAdvisor, and Node Exporter. Application-specific exporters and provisioned Grafana dashboards are not included yet; configure the Prometheus data source and dashboards in Grafana as needed.
+
+## Validate before starting
+
+Run these commands from the project root. They validate Bash syntax and both Compose configurations without starting containers or changing stored data:
+
+```bash
+bash -n setup.sh scripts/backup.sh scripts/restore.sh scripts/optimize.sh
+docker compose --env-file .env.example config --quiet
+docker compose --env-file .env.example -f docker-compose.monitoring.yml config --quiet
+```
+
+On Windows, Git Bash can run the `bash -n` syntax check. Run operational shell scripts in Linux, macOS, or WSL2 with Docker Engine; Git Bash alone is not a supported environment for backup/restore operations. With Docker Desktop, Compose validation can also be run from PowerShell.
+
+To smoke-test deployment, use an isolated machine or disposable clone, replace every placeholder secret, run the setup script, then start the stacks. Do not run restore or backup tests against data you need to keep.
 
 ## Security notes
 
 - `.env` and private TLS keys are intentionally excluded from Git.
 - Replace all example credentials before any shared or production deployment.
+- Credentials included in earlier public revisions should be considered exposed. Rotate any value you actually used; changing `.env` alone does not reset an existing Grafana admin password.
 - Review the exposed ports and mount permissions for the target host.
 
 ## Project documentation
 
 The architecture summary from the original project brief is kept in `docs/project-summary.md`.
+
+## Portfolio
+
+See the personal portfolio and selected-project overview at [concavu.github.io/vu-tran-portfolio](https://concavu.github.io/vu-tran-portfolio/).

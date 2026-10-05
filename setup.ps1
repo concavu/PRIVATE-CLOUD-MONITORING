@@ -11,15 +11,27 @@ if (-not (Test-Path ".env")) {
     Copy-Item ".env.example" ".env"
 }
 
-if (-not (Test-Path "nginx\ssl\server.crt")) {
-    Write-Host "[!] Khong tim thay SSL cert. Vui long sinh khoa hoac dung file co san." -ForegroundColor Red
-} else {
-    Write-Host "[✔] Chung chi SSL da san sang tai nginx/ssl!" -ForegroundColor Green
-}
+if (-not (Test-Path "nginx\ssl\server.crt") -or -not (Test-Path "nginx\ssl\server.key")) {
+    $OpenSsl = Get-Command openssl -ErrorAction SilentlyContinue
+    if (-not $OpenSsl) {
+        throw "OpenSSL is required to generate the local TLS certificate. Install OpenSSL or place server.crt and server.key in nginx\ssl."
+    }
 
-Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "Ha tang da san sang! Chay lenh sau de khoi dong:" -ForegroundColor Green
-Write-Host "    docker compose up -d" -ForegroundColor Yellow
-Write-Host "Kiem tra tien trinh:" -ForegroundColor Cyan
-Write-Host "    docker compose ps" -ForegroundColor Yellow
-Write-Host "======================================================================" -ForegroundColor Cyan
+    Write-Host "[+] Dang tao chung chi TLS self-signed..." -ForegroundColor Cyan
+    & $OpenSsl.Source req -x509 -nodes -days 365 -newkey rsa:2048 `
+        -keyout "nginx\ssl\server.key" `
+        -out "nginx\ssl\server.crt" `
+        -subj "/C=VN/ST=Hanoi/L=Hanoi/O=PrivateCloud/OU=DevOps/CN=cloud.local" `
+        -addext "subjectAltName=DNS:cloud.local,DNS:localhost,IP:127.0.0.1"
+    if ($LASTEXITCODE -ne 0) {
+        throw "OpenSSL failed to generate the local TLS certificate."
+    }
+}
+Write-Host "[OK] Chung chi SSL da san sang tai nginx/ssl!" -ForegroundColor Green
+
+Write-Host '======================================================================' -ForegroundColor Cyan
+Write-Host 'Ha tang da san sang! Chay lenh sau de khoi dong:' -ForegroundColor Green
+Write-Host '    docker compose up -d' -ForegroundColor Yellow
+Write-Host 'Kiem tra tien trinh:' -ForegroundColor Cyan
+Write-Host '    docker compose ps' -ForegroundColor Yellow
+Write-Host '======================================================================' -ForegroundColor Cyan

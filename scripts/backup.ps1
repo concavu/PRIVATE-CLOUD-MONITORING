@@ -19,7 +19,10 @@ docker exec -u www-data nextcloud_app_core php occ maintenance:mode --on 2>$null
 # 2. Dump DB
 Write-Host "[2/4] Xuat MariaDB database..." -ForegroundColor Yellow
 $DbFile = Join-Path $TmpDir "mariadb_dump_$Timestamp.sql"
-docker exec mariadb_db_engine mariadb-dump -u root -pMariaDbRootSecretPassword2026! --single-transaction --quick nextcloud | Out-File -FilePath $DbFile -Encoding utf8
+docker exec mariadb_db_engine sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mariadb-dump -u root --single-transaction --quick "$MYSQL_DATABASE"' | Out-File -FilePath $DbFile -Encoding utf8
+if ($LASTEXITCODE -ne 0) {
+    throw "MariaDB dump failed (docker exit code $LASTEXITCODE)."
+}
 
 # 3. Tat maintenance mode
 Write-Host "[3/4] Tat maintenance mode..." -ForegroundColor Yellow
