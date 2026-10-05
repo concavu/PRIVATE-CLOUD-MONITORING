@@ -113,6 +113,7 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - monitoring_net
+      - grafana_access_net
 
 networks:
   monitoring_net:
@@ -124,6 +125,9 @@ networks:
   storage_net:
     name: net_cloud_storage
     external: true
+  grafana_access_net:
+    name: net_cloud_grafana_access
+    driver: bridge
 
 volumes:
   prometheus_data:
