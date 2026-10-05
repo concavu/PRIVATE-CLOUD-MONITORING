@@ -14,4 +14,4 @@ Docker Compose, Nginx, Nextcloud, MariaDB, Redis, MinIO S3, Prometheus, Grafana,
 
 ## Observability
 
-The current Prometheus configuration scrapes Prometheus itself, cAdvisor, and Node Exporter for Prometheus, container, and host metrics. Application-specific exporters and provisioned Grafana dashboards are not included yet; add those separately to monitor Nextcloud, MariaDB, Redis, MinIO, and Nginx directly.
+The current Prometheus configuration scrapes Prometheus itself, cAdvisor, and Node Exporter for Prometheus, container, and host metrics. Grafana automatically provisions Prometheus as its data source and a starter host/container dashboard. Application-specific exporters and application dashboards are not included yet; add those separately to monitor Nextcloud, MariaDB, Redis, MinIO, and Nginx directly.

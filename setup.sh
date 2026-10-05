@@ -5,6 +5,7 @@
 # ==============================================================================
 
 set -euo pipefail
+umask 077
 
 # Colors for logging
 GREEN='\033[0;32m'
@@ -20,6 +21,41 @@ mkdir -p nginx/ssl nginx/conf.d scripts backups
 if [ ! -f .env ]; then
     echo -e "${YELLOW}[!] Chưa tìm thấy file .env, sao chép từ .env.example...${NC}"
     cp .env.example .env
+fi
+chmod 600 .env
+
+set_secret_if_missing_or_placeholder() {
+    local key="$1"
+    if ! grep -Eq "^${key}=[^[:space:]]+$" .env \
+        || grep -Eiq "^${key}=(REPLACE_.*|replace-with-a-long-random-password)$" .env; then
+        local secret
+        secret="$(openssl rand -hex 32)"
+        local env_tmp
+        env_tmp="$(mktemp)"
+        awk -v key="$key" -v secret="$secret" '
+            BEGIN { found = 0 }
+            index($0, key "=") == 1 {
+                print key "=" secret
+                found = 1
+                next
+            }
+            { print }
+            END {
+                if (!found) print key "=" secret
+            }
+        ' .env > "$env_tmp"
+        cat "$env_tmp" > .env
+        rm -f "$env_tmp"
+        echo -e "${GREEN}[✔] Đã tạo giá trị ngẫu nhiên cho ${key}.${NC}"
+    fi
+}
+
+for secret_key in ADMIN_PASSWORD MYSQL_ROOT_PASSWORD MYSQL_PASSWORD REDIS_PASSWORD MINIO_ROOT_PASSWORD GRAFANA_ADMIN_PASSWORD; do
+    set_secret_if_missing_or_placeholder "$secret_key"
+done
+
+if [ -f .env ]; then
+    chmod 600 .env
 fi
 
 # 2. Sinh cặp chứng chỉ SSL/TLS Self-Signed cho Nginx Reverse Proxy

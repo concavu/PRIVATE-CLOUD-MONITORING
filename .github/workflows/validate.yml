@@ -1,0 +1,38 @@
+name: Validate cloud stack
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate shell scripts
+        run: bash -n setup.sh scripts/backup.sh scripts/restore.sh scripts/optimize.sh
+
+      - name: Validate Grafana dashboard JSON
+        run: python -m json.tool monitoring/grafana/dashboards/host-and-containers.json > /dev/null
+
+      - name: Validate Prometheus configuration
+        run: |
+          docker run --rm \
+            --entrypoint=/bin/promtool \
+            -v "$PWD/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro" \
+            prom/prometheus:v2.53.0 \
+            check config /etc/prometheus/prometheus.yml
+
+      - name: Validate core Compose configuration
+        run: docker compose --env-file .env.example config --quiet
+
+      - name: Validate monitoring Compose configuration
+        run: docker compose --env-file .env.example -f docker-compose.monitoring.yml config --quiet
